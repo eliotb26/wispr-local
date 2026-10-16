@@ -7,13 +7,13 @@ Speech-to-text runs locally with whisper.cpp. An optional Claude Haiku pass remo
 ## Run it
 
 ```sh
-cd ~/Developer/flowfree && swift run -c release flowfree
+cd ~/Developer/wispr-local && swift run -c release flowfree
 ```
 
 From inside Claude Code, put `!` in front:
 
 ```
-! cd ~/Developer/flowfree && swift run -c release flowfree
+! cd ~/Developer/wispr-local && swift run -c release flowfree
 ```
 
 Once it prints `ready`, hold **right Option**, talk, and let go. You'll hear a *tink* when recording starts and a *pop* when it stops. Press `Ctrl+C` to quit.
