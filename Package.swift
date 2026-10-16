@@ -2,9 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "flowfree",
+    name: "wispr-local",
     platforms: [.macOS(.v13)],
     targets: [
-        .executableTarget(name: "flowfree", path: "Sources/flowfree")
+        .target(name: "WisprLocalCore"),
+        .executableTarget(name: "wispr-local", dependencies: ["WisprLocalCore"]),
+        .testTarget(name: "WisprLocalCoreTests", dependencies: ["WisprLocalCore"]),
     ]
 )
