@@ -1,93 +1,79 @@
 # wispr-local
 
-**A free, local alternative to Wispr Flow for macOS.** Hold a key, talk and let go. Clean text lands wherever you were typing, in any app.
+A free, open-source rebuild of Wispr Flow for macOS: hold right Option, talk, let go, and clean text appears in whatever app you were typing in.
 
-- **$0.** Speech-to-text runs on your Mac with [whisper.cpp](https://github.com/ggml-org/whisper.cpp), in about 0.9 s on an M4 Pro.
-- **Fixes what you meant.** An optional Claude Haiku pass removes filler words, applies self-corrections ("Tuesday, no wait, Thursday") and spells names the way they already appear on your screen.
-- **Small.** About 500 lines of Swift, with no dependencies beyond whisper.cpp.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/hero-dark.png">
+  <img src="docs/hero.png" width="800" alt="What you said, with the filler words struck out, above what lands in the app: 'Hey Sarah, I think we should ship the onboarding fix on Thursday.' Below, a timing strip from one real run: whisper 0.85 s, Claude 2.56 s, pasted 3.41 s after letting go.">
+</picture>
 
-> "Um, so, hey Sarah, I think we should, uh, ship the onboarding fix on Tuesday. No wait, Thursday."
-> → "Hey Sarah, I think we should ship the onboarding fix on Thursday."
+Speech to text runs on your Mac with whisper.cpp. Claude tidies the transcript. The whole app is about 515 lines of Swift.
 
 ## Quick start
 
 ```sh
-git clone https://github.com/eliotb26/wispr-local.git
-cd wispr-local
-./scripts/setup.sh                 # installs whisper.cpp, downloads the model, builds
+git clone https://github.com/eliotb26/wispr-local.git && cd wispr-local
+./scripts/setup.sh
 swift run -c release wispr-local
 ```
 
-Once it prints `ready`, hold **right Option**, talk, and let go. You'll hear a *tink* when recording starts and a *pop* when it stops. Press `Ctrl+C` to quit.
+Setup needs Homebrew. It installs whisper.cpp, downloads the 574 MB speech model into `models/` and builds. Run it from the repo folder, since that's where it looks for the model.
 
-**The first time**, macOS asks for two permissions for your terminal app (Terminal, Ghostty, iTerm…). Grant both in System Settings → Privacy & Security, then restart wispr-local:
-- **Microphone**, to record your voice
-- **Accessibility**, for the global hotkey, reading the focused field and pasting
+When it prints `ready`, hold right Option and talk. A tink means it's listening, a pop means it stopped. Ctrl+C quits.
 
-The very first dictation takes about 12 seconds while whisper compiles its GPU shaders. After that it's fast.
+The first time, macOS asks your terminal app for Microphone and Accessibility access. Grant both in System Settings > Privacy & Security, then start it again. The first dictation takes about 12 seconds while whisper compiles its GPU shaders. After that it's quick.
 
-## Options
-
-| Flag | What it does |
-|---|---|
-| *(none)* | Whisper, then Claude cleanup |
-| `--raw` | Whisper only: fully offline, faster, keeps filler words |
-| `--lang <code>` | Spoken language, such as `es` or `auto` (default `en`) |
-| `--help` | Show usage |
-
-The cleanup step uses the [Claude Code](https://claude.com/claude-code) CLI (`claude`) and your existing plan, so no API key is needed. Without it, use `--raw`.
+Cleanup goes through the [Claude Code](https://claude.com/claude-code) CLI and your existing plan, so there's no API key to set up. Without it, run with `--raw`. For other languages, add `--lang es` or `--lang auto`.
 
 ## How it works
 
-```
-right ⌥ down ─► capture context: frontmost app + focused field text (Accessibility)
-             └► record mic → 16 kHz mono WAV
-right ⌥ up   ─► whisper-cli, local, on the GPU
-             ─► claude -p --model haiku: cleanup with screen context (skipped under 5 words)
-             ─► save clipboard → set text (concealed type) → ⌘V → restore clipboard after 500 ms
-```
+When you press the key, it notes the frontmost app and the text already in the focused field, and starts recording.
 
-The clipboard swap is invisible: your clipboard comes back half a second later, unless you copied something else in the meantime. The text is marked `org.nspasteboard.ConcealedType`, so clipboard managers don't record it.
+When you let go, `whisper-cli` transcribes the audio on the GPU.
 
-| Path | Job |
-|---|---|
-| `Sources/WisprLocalCore/` | Pure logic, unit-tested: options, cleanup rules and prompt, timing log |
-| `Sources/wispr-local/main.swift` | Startup, permissions, hotkey |
-| `Sources/wispr-local/Controller.swift` | One dictation at a time, from key down to paste |
-| `Sources/wispr-local/Recorder.swift` | Microphone to 16 kHz WAV |
-| `Sources/wispr-local/Context.swift` | Frontmost app and focused-field text |
-| `Sources/wispr-local/Pipeline.swift` | whisper.cpp and the Claude cleanup call |
-| `Sources/wispr-local/Paster.swift` | Clipboard swap, ⌘V, restore |
-| `Sources/wispr-local/Shell.swift` | Process runner with timeouts |
+If you said five words or more, Claude Haiku removes the filler, applies corrections like "Tuesday, no wait, Thursday", and spells names the way they already appear on your screen.
 
-## Speed (M4 Pro)
+The result goes on the clipboard, ⌘V pastes it, and your own clipboard comes back 500 ms later. The text is marked concealed, so clipboard managers don't keep it.
 
-| Step | Time |
-|---|---|
-| Transcription, warm | ~0.9 s |
-| Cleanup via the Claude Code CLI | 2–5 s, mostly CLI startup |
+On an M4 Pro, transcription took 0.8 to 1.2 s across eight real runs. With cleanup on, text landed 3.4 to 4.9 s after letting go, and 2.6 to 3.9 s of that was Claude, mostly CLI startup. The raw numbers are in [docs/runs-m4-pro.csv](docs/runs-m4-pro.csv). Every dictation appends its timings and the app name to `runs.csv`. It never logs what you said.
 
-Each dictation appends its timings (audio length, word count, asr/llm/total ms and app name) to `runs.csv`. **The dictated text is never logged.**
+`Sources/WisprLocalCore` holds the logic that can be tested without a microphone, and its 13 tests. `Sources/wispr-local` is the app itself: hotkey, recorder, whisper and Claude calls, paste.
+
+## Make your own
+
+The app is small enough to reshape, or rebuild from scratch, with Claude Code. Open Claude Code in this folder and ask for the change you want: a different key, a hands-free mode, a local model for cleanup. Or start from nothing with a prompt like this one:
+
+> Build a macOS command-line tool in Swift. While I hold right Option, record the microphone. When I let go, transcribe it locally with whisper.cpp, ask Claude to remove filler words and apply spoken corrections, and paste the result into the focused app. Put my clipboard back afterwards.
 
 ## Privacy
 
-Audio and transcription stay on your Mac. With cleanup on, the transcript, the frontmost app's name and up to 1,500 characters of the focused field are sent to Claude. With `--raw`, nothing leaves your machine.
+Your voice never leaves your Mac. Audio is recorded to a temporary file, transcribed locally and deleted.
 
-## Known gaps
+With cleanup on, the transcript, the app's name and up to 1,500 characters of the focused field are sent to Claude, so it can match names and tone. With `--raw`, nothing leaves the machine.
 
-- **Cleanup latency.** The Claude Code CLI starts fresh on every call. A direct API call or a local model would get it to about a second.
-- **Hold-to-talk only.** No hands-free toggle, menu bar icon or launch-at-login yet.
-- **Paste-blocking fields.** Paste uses ⌘V, so fields that block paste won't receive the text.
-- **Permissions.** Accessibility is granted to the terminal running it, not to a standalone app.
+## Limitations
+
+- Cleanup is the slow part, because the Claude Code CLI starts fresh on every call. A direct API call or a local model would bring it closer to a second.
+- Hold to talk only. There's no hands-free mode, menu bar icon or launch at login.
+- It pastes with ⌘V, so fields that block paste won't get the text.
+- Permissions are granted to your terminal, not to a standalone app.
+- Tested on one machine, an M4 Pro on macOS. Requires macOS 13 or later.
 
 ## Development
 
 ```sh
 swift build -c release
-swift test        # needs full Xcode for Swift Testing:
-                  # DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+swift test
 ```
+
+The tests use Swift Testing, which needs full Xcode. If `swift test` can't find it, prefix it with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+
+## Credits
+
+Transcription is [whisper.cpp](https://github.com/ggml-org/whisper.cpp) by Georgi Gerganov and contributors, running `ggml-large-v3-turbo-q5_0.bin`, a quantized build of OpenAI's Whisper large-v3-turbo. Cleanup is Claude Haiku, called through Claude Code.
 
 ## License
 
-MIT. Not affiliated with or endorsed by Wispr. "Wispr Flow" is a trademark of its owner.
+MIT. See [LICENSE](LICENSE).
+
+wispr-local is an independent project. It is not affiliated with or endorsed by Wispr, and Wispr Flow is a trademark of its owner.
