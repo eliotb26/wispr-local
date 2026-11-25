@@ -11,14 +11,14 @@ func draw(_ pixels: Int) -> Data {
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     let unit = CGFloat(pixels) / 1024
-    NSColor(srgbRed: 0.05, green: 0.055, blue: 0.063, alpha: 1).setFill()
-    NSBezierPath(roundedRect: NSRect(x: 100 * unit, y: 100 * unit, width: 824 * unit, height: 824 * unit), xRadius: 186 * unit, yRadius: 186 * unit).fill()
-    // Speech bars settling into a straight line: rough voice in, clean text out.
-    let heights: [CGFloat] = [180, 400, 260, 120, 64]
-    for (index, height) in heights.enumerated() {
-        (index == heights.count - 1 ? NSColor.white : NSColor(srgbRed: 0.784, green: 0.941, blue: 0.294, alpha: 1)).setFill()
-        let rect = NSRect(x: (236 + CGFloat(index) * 122) * unit, y: (512 - height / 2) * unit, width: 64 * unit, height: height * unit)
-        NSBezierPath(roundedRect: rect, xRadius: 32 * unit, yRadius: 32 * unit).fill()
+    let tile = NSBezierPath(roundedRect: NSRect(x: 100 * unit, y: 100 * unit, width: 824 * unit, height: 824 * unit), xRadius: 186 * unit, yRadius: 186 * unit)
+    let colors = [NSColor(srgbRed: 0.153, green: 0.388, blue: 0.843, alpha: 1), NSColor(srgbRed: 0.424, green: 0.773, blue: 1, alpha: 1),
+                  NSColor(srgbRed: 0.561, green: 0.922, blue: 0.816, alpha: 1)]
+    NSGradient(colors: colors)?.draw(in: tile, angle: -50)
+    NSColor.white.setFill()
+    for (index, height) in [CGFloat(200), 460, 310, 160].enumerated() {
+        let rect = NSRect(x: (270 + CGFloat(index) * 134) * unit, y: (512 - height / 2) * unit, width: 82 * unit, height: height * unit)
+        NSBezierPath(roundedRect: rect, xRadius: 41 * unit, yRadius: 41 * unit).fill()
     }
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!

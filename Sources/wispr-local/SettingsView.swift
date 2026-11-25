@@ -15,7 +15,15 @@ struct SettingsView: View {
         Page(title: "Settings", subtitle: problem) {
             Group {
                 VStack(alignment: .leading, spacing: 0) {
-                    SectionLabel("Dictation").padding(.top, -32)
+                    SectionLabel("Appearance").padding(.top, -32)
+                    Card {
+                        GraphiteRow(title: "Theme", isLast: true) {
+                            Picker("", selection: $state.look) { ForEach(Look.allCases, id: \.self) { Text($0.rawValue).tag($0) } }
+                                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        }
+                    }
+                    SectionLabel("Dictation")
+                    Card {
                     GraphiteRow(title: "Hold to talk") {
                         Picker("", selection: Binding(get: { state.key }, set: { state.key = $0; Settings.key = $0 })) {
                             ForEach([HotKey.fn, .rightOption], id: \.self) { Text($0.label).tag($0) }
@@ -32,8 +40,10 @@ struct SettingsView: View {
                             opensAtLogin = Settings.opensAtLogin
                         }
                     }
-                    toggle("Sound when you let go", nil, $playSound) { Settings.playSound = $0 }
+                    toggle("Sound when you let go", nil, $playSound, isLast: true) { Settings.playSound = $0 }
+                    }
                     SectionLabel("Privacy")
+                    Card {
                     GraphiteRow(title: "Keep history", detail: "Skips password fields macOS can detect.") {
                         Picker("", selection: $retention) { ForEach(Retention.allCases, id: \.self) { Text($0.label).tag($0) } }
                             .labelsHidden().fixedSize()
@@ -41,12 +51,15 @@ struct SettingsView: View {
                     }
                     toggle("Keep recordings", "For measuring and training on your voice. Deleted with their history entry.", $keepAudio) { Settings.keepAudio = $0 }
                     toggle("Use Claude for hard edits", "Sends those transcripts, the app's name and nearby text to Claude.", $useClaude) { Settings.useClaude = $0 }
-                    GraphiteRow(title: "Delete everything saved", detail: "History, recordings and timings. Voice test files stay.") {
+                    GraphiteRow(title: "Delete everything saved", detail: "History, recordings and timings. Voice test files stay.", isLast: true) {
                         Button("Delete\u{2026}", role: .destructive) { isConfirmingDelete = true }.graphite(.danger)
                     }
+                    }
                     SectionLabel("Help")
-                    GraphiteRow(title: "Something not working?", detail: "The log never holds what you said.") {
+                    Card {
+                    GraphiteRow(title: "Something not working?", detail: "The log never holds what you said.", isLast: true) {
                         Button("Show log") { NSWorkspace.shared.open(Paths.log) }.graphite()
+                    }
                     }
                 }
             }
@@ -56,8 +69,8 @@ struct SettingsView: View {
         }
     }
 
-    private func toggle(_ title: String, _ detail: String?, _ value: Binding<Bool>, change: @escaping (Bool) -> Void) -> some View {
-        GraphiteRow(title: title, detail: detail) {
+    private func toggle(_ title: String, _ detail: String?, _ value: Binding<Bool>, isLast: Bool = false, change: @escaping (Bool) -> Void) -> some View {
+        GraphiteRow(title: title, detail: detail, isLast: isLast) {
             Toggle(title, isOn: value).labelsHidden().toggleStyle(.switch).controlSize(.small).onChange(of: value.wrappedValue, perform: change)
         }
     }

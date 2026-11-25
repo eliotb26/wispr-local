@@ -56,16 +56,18 @@ final class VoiceTest: ObservableObject {
 
 struct VoiceTestView: View {
     @ObservedObject var test: VoiceTest
+    @ObservedObject var voice: LiveVoice
     let keyLabel: String
 
     var body: some View {
-        Page {
+        Page(title: "Voice test", subtitle: "Read 30 sentences to measure how well each speech model hears you.") {
             VStack(alignment: .leading, spacing: 24) {
                 progress
                 Text(test.isDone ? "All \(VoiceTest.sentences.count) sentences recorded" : VoiceTest.sentences[test.index])
                     .font(Theme.display).tracking(-0.8).fixedSize(horizontal: false, vertical: true)
-                    .frame(minHeight: 120, alignment: .topLeading)
+                    .frame(minHeight: 80, alignment: .topLeading)
                 Text(hint).font(Theme.reading).foregroundStyle(test.status.isEmpty ? Theme.muted : Theme.danger)
+                VoiceField(voice: voice).frame(height: 112).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 HStack(spacing: 8) {
                     Button("Redo previous") { test.back() }.graphite().disabled(test.index == 0)
                     Button("Show recordings") { NSWorkspace.shared.open(Paths.voiceTest) }.graphite(.ghost)

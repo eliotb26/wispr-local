@@ -9,6 +9,8 @@ final class Controller {
     static let liveWindowSeconds = 12.0
 
     var onRecordingChange: (Bool) -> Void = { _ in }
+    var onLevel: (Float) -> Void = { _ in }
+    var onWords: (String) -> Void = { _ in }
     var onResult: (Dictation, [Float]) -> Void = { _, _ in }
     /// Returns where the recording should go instead of being typed, e.g. the voice test.
     var captureTarget: () -> (([Float]) -> Void)? = { nil }
@@ -49,7 +51,10 @@ final class Controller {
         self.options = options
         self.server = server
         self.timingLog = timingLog
-        recorder.onLevel = { [pill] in pill.setLevel($0) }
+        recorder.onLevel = { [weak self] in
+            self?.pill.setLevel($0)
+            self?.onLevel($0)
+        }
     }
 
     private var allowClaude: Bool { options.allowClaude && (!Paths.isApp || Settings.useClaude) }
@@ -116,6 +121,7 @@ final class Controller {
                     self.liveBusy = false
                     guard let text, current == self.session, !Cleanup.isEmptyTranscript(text) else { return }
                     self.pill.setWords(text)
+                    self.onWords(text)
                 }
             }
         }

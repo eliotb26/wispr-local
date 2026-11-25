@@ -40,7 +40,12 @@ func setStatus(_ text: String) {
     state.status = text
 }
 
-controller.onRecordingChange = { statusMenu?.setRecording($0) }
+controller.onRecordingChange = {
+    statusMenu?.setRecording($0)
+    state.voice.setRecording($0)
+}
+controller.onLevel = { state.voice.hear($0) }
+controller.onWords = { state.voice.words = $0 }
 if Paths.isApp {
     state.history.purge() // also loads it, so retention applies even if the window is never opened
     state.onDeleteAll = {

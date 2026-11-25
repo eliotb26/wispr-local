@@ -14,11 +14,11 @@ struct WordsView: View {
             }
             .padding(.bottom, 16)
             if let problem { Text(problem).foregroundStyle(Theme.danger).padding(.bottom, 12) }
-            ForEach(terms, id: \.self) { term in
-                GraphiteRow(title: term) {
+            if !terms.isEmpty { Card { ForEach(terms, id: \.self) { term in
+                GraphiteRow(title: term, isLast: term == terms.last) {
                     Button("Remove") { save(terms.filter { $0 != term }) }.graphite(.ghost, small: true)
                 }
-            }
+            } } }
         }
         .onAppear(perform: load)
     }
@@ -26,7 +26,7 @@ struct WordsView: View {
     private func load() {
         guard FileManager.default.fileExists(atPath: Paths.vocabulary.path) else { return }
         do {
-            terms = Vocabulary.terms(in: try String(contentsOf: Paths.vocabulary, encoding: .utf8))
+            terms = Vocabulary.unique(in: try String(contentsOf: Paths.vocabulary, encoding: .utf8))
         } catch {
             problem = "Couldn't read your words: \(error.localizedDescription)"
         }

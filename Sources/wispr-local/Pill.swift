@@ -99,7 +99,7 @@ private struct PillView: View {
     private var bars: some View {
         HStack(spacing: 2.5) {
             ForEach(model.levels.indices, id: \.self) { index in
-                Capsule().fill(Theme.accent).frame(width: 2.5, height: 20)
+                Capsule().fill(LinearGradient(colors: [Theme.mint, Theme.sky], startPoint: .top, endPoint: .bottom)).frame(width: 2.5, height: 20)
                     .scaleEffect(y: CGFloat(max(0.14, model.levels[index])))
             }
         }

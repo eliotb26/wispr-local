@@ -153,6 +153,8 @@ extension Vocabulary {
             .filter { !$0.isEmpty && !$0.hasPrefix("#") }
     }
 
+    public static func unique(in text: String) -> [String] { terms(in: text).reduce([]) { adding($1, to: $0) } }
+
     /// Adds a term unless it is already there, ignoring case.
     public static func adding(_ term: String, to terms: [String]) -> [String] {
         let term = term.split(whereSeparator: \.isWhitespace).joined(separator: " ")

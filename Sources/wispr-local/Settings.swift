@@ -23,6 +23,12 @@ enum Settings {
         set { defaults.set(newValue, forKey: "keepAudio") }
     }
 
+    /// Light unless the user picks otherwise.
+    static var look: Look {
+        get { defaults.string(forKey: "look").flatMap(Look.init) ?? .light }
+        set { defaults.set(newValue.rawValue, forKey: "look") }
+    }
+
     static var playSound: Bool {
         get { defaults.object(forKey: "playSound") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "playSound") }

@@ -1,26 +1,29 @@
 import SwiftUI
 
-/// Graphite neutrals, light and dark, with citron as the one accent. Citron means live, selected or the main action.
+/// Graphite design roles, light and dark, plus the aurora colors that mean "voice".
 enum Theme {
+    static let cobalt = role(0x2763D7, 0x2763D7), sky = role(0x6CC5FF, 0x6CC5FF), mint = role(0x8FEBD0, 0x8FEBD0), lemon = role(0xF3F6A6, 0xF3F6A6)
+    static let raised = role(0xFFFFFF, 0x202326)
+    static let window = role(0xF1F4F8, 0x0D0E10)
     static let background = role(0xFFFFFF, 0x0D0E10)
     static let subtle = role(0xF5F8FB, 0x131416)
     static let hover = role(0xEDF0F5, 0x1A1C1F)
     static let border = role(0xD6DBE2, 0x2D3136)
     static let text = role(0x1D1F23, 0xEBEFF4)
     static let muted = role(0x5F646A, 0xB0B5BB)
-    static let accent = role(0xC8F04B, 0xC8F04B)
-    static let accentSubtle = role(0xF2FBD6, 0x20280E)
-    static let accentText = role(0x4B6100, 0xC8F04B)
+    static let accent = role(0x2763D7, 0x3C72DA)
+    static let accentSubtle = role(0xE7EFFE, 0x162137)
+    static let accentText = role(0x335FB4, 0xA5C5FF)
     /// Switches, progress and focus: dark enough to see on white.
-    static let control = role(0x6E8F00, 0xC8F04B)
-    static let onAccent = role(0x14170A, 0x14170A)
+    static let control = role(0x2763D7, 0x3C72DA)
+    static let onAccent = Color.white
     static let warning = role(0x8A5600, 0xF4A437)
     static let danger = role(0xC9302D, 0xEC5C52)
     static let borderStrong = role(0xB4B9C1, 0x4C5157)
     static let surface = role(0xFFFFFF, 0x131416)
     static let placeholder = role(0x878D94, 0x646970)
     static let active = role(0xE6EAEF, 0x202326)
-    static let accentHover = role(0xB8E233, 0xD6F870)
+    static let accentHover = role(0x1A54C8, 0x477EE8)
     static let dangerSubtle = role(0xFBE9E8, 0x2E1413)
     static let success = role(0x1D7D3E, 0x4CB86A)
 
@@ -56,8 +59,8 @@ struct Page<Content: View>: View {
                 }
                 content
             }
-            .frame(maxWidth: 640, alignment: .leading)
-            .padding(.horizontal, 32).padding(.vertical, 32)
+            .frame(maxWidth: 760, alignment: .leading)
+            .padding(.horizontal, 40).padding(.top, 44).padding(.bottom, 40)
             .frame(maxWidth: .infinity)
         }
     }
@@ -71,24 +74,23 @@ struct SectionLabel: View {
     }
 }
 
-/// A number that is the point of the view.
-struct Stat: View {
-    let value: String
-    let label: String
+/// A raised group of rows.
+struct Card<Content: View>: View {
+    @ViewBuilder let content: Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(value).font(Theme.page).tracking(-0.4).monospacedDigit()
-            Text(label).font(Theme.small).foregroundStyle(Theme.muted)
-        }
-        .accessibilityElement(children: .combine)
+        VStack(alignment: .leading, spacing: 0) { content }
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.surface))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.border))
     }
 }
 
 /// A key on the keyboard.
 struct KeyCap: View {
     let label: String
+    var isLarge = false
     var body: some View {
-        Text(label).font(Theme.captionStrong).padding(.horizontal, 6).frame(height: 20)
+        Text(label).font(isLarge ? Theme.title : Theme.captionStrong).foregroundStyle(Theme.text).shadow(color: .clear, radius: 0)
+            .padding(.horizontal, isLarge ? 12 : 6).frame(height: isLarge ? 36 : 20)
             .background(RoundedRectangle(cornerRadius: Theme.smallRadius).fill(Theme.surface))
             .overlay(RoundedRectangle(cornerRadius: Theme.smallRadius).strokeBorder(Theme.borderStrong))
     }
@@ -127,6 +129,8 @@ private struct GraphiteButtonBody: View {
             .overlay(shape.strokeBorder(border))
             .contentShape(shape)
             .opacity(isEnabled ? 1 : 0.5)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
             .onHover { isHovered = $0 && isEnabled }
     }
 
@@ -187,6 +191,7 @@ struct GraphiteField: View {
 struct GraphiteRow<Control: View>: View {
     let title: String
     var detail: String?
+    var isLast = false
     @ViewBuilder let control: Control
 
     var body: some View {
@@ -199,9 +204,10 @@ struct GraphiteRow<Control: View>: View {
                 Spacer()
                 control
             }
-            .frame(minHeight: 40)
+            .frame(minHeight: 36)
             .padding(.vertical, 8)
-            Hairline()
+            if !isLast { Hairline() }
         }
+        .padding(.horizontal, 20)
     }
 }
