@@ -26,6 +26,8 @@ struct InsightsView: View {
                 StatTile(value: "\(insights.corrected)", label: "corrections")
             }
             .padding(.top, 12)
+            SectionLabel("Ranks")
+            RankLadder(words: store.totals.words)
             SectionLabel("Where you talk")
             Card {
                 if insights.apps.isEmpty { Text("Nothing yet.").foregroundStyle(Theme.muted).padding(20).frame(maxWidth: .infinity, alignment: .leading) }

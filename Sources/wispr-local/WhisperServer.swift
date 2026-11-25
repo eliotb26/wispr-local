@@ -68,7 +68,17 @@ final class WhisperServer {
         }
     }
 
+    /// For tuning: a saved recording, with these terms in place of the user's words.
+    func transcribe(wav: Data, terms: [String]) throws -> String {
+        try attempt(wav: wav, prompt: Vocabulary.prompt(from: terms.joined(separator: "\n")))
+    }
+
     private func attempt(_ samples: [Float]) throws -> String {
+        let words = (try? String(contentsOf: Paths.vocabulary, encoding: .utf8)).map(Vocabulary.prompt) ?? ""
+        return try attempt(wav: WavEncoder.encode(samples), prompt: words)
+    }
+
+    private func attempt(wav: Data, prompt: String) throws -> String {
         try ensureRunning()
         let boundary = UUID().uuidString
         var body = Data()
@@ -78,11 +88,10 @@ final class WhisperServer {
             body.append(value)
             body.append(Data("\r\n".utf8))
         }
-        field("file", WavEncoder.encode(samples), file: "audio.wav")
+        field("file", wav, file: "audio.wav")
         field("response_format", Data("text".utf8))
         field("language", Data(language.utf8))
-        let words = (try? String(contentsOf: Paths.vocabulary, encoding: .utf8)).map(Vocabulary.prompt) ?? ""
-        if !words.isEmpty { field("prompt", Data(words.utf8)) }
+        if !prompt.isEmpty { field("prompt", Data(prompt.utf8)) }
         body.append(Data("--\(boundary)--\r\n".utf8))
 
         var post = request("/inference", timeout: Self.requestTimeout)

@@ -6,26 +6,60 @@ struct HomeView: View {
     @ObservedObject var store: HistoryStore
     @ObservedObject var profile: Profile
     @ObservedObject var voice: LiveVoice
+    @ObservedObject var words: WordStore
+    @ObservedObject var snippets: SnippetStore
+    @State private var hidesSteps = Settings.hidesSteps
+    @State private var isConnected = false
 
     var body: some View {
-        let stats = DictationStats(store.entries), insights = Insights(store.entries, now: Date())
-        Page {
-            Text(profile.firstName.isEmpty ? greeting : "\(greeting), \(profile.firstName)").font(Theme.display).tracking(-0.9)
-                .accessibilityAddTraits(.isHeader).padding(.bottom, 20)
-            hero
-            HStack(spacing: 12) {
-                StatTile(value: stats.words.formatted(), label: "words")
-                StatTile(value: "\(stats.wordsPerMinute)", label: "words a minute")
-                StatTile(value: "\(insights.minutesSaved) min", label: "saved over typing")
-                StatTile(value: "\(insights.streak)", label: "day streak")
-            }
-            .padding(.top, 12)
-            HStack {
-                SectionLabel("Recent")
-                Spacer()
-                if !store.entries.isEmpty {
-                    Button("See all") { state.section = .history }.graphite(.ghost, small: true).padding(.top, 24)
+        let steps = self.steps, next = steps.first { !$0.isDone }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(profile.firstName.isEmpty ? greeting : "\(greeting), \(profile.firstName)").font(Theme.display).tracking(-0.9).accessibilityAddTraits(.isHeader)
+                HStack(alignment: .top, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        hero
+                        if !hidesSteps, let next { StepBanner(step: next) }
+                        recent
+                    }
+                    VStack(spacing: 12) {
+                        ProgressCard(totals: store.totals)
+                        if !hidesSteps, next != nil {
+                            StepsCard(steps: steps) { hidesSteps = true; Settings.hidesSteps = true }
+                        }
+                    }
+                    .frame(width: 232)
                 }
+            }
+            .frame(maxWidth: 960, alignment: .leading)
+            .padding(.horizontal, 32).padding(.top, 44).padding(.bottom, 40)
+            .frame(maxWidth: .infinity)
+        }
+        .onAppear(perform: checkConnections)
+        .onChange(of: state.settings) { if $0 == nil { checkConnections() } }
+    }
+
+    private func checkConnections() { isConnected = ConnectedApp.allCases.contains(where: \.isConnected) }
+
+    private var steps: [Step] {
+        [Step(id: "talk", title: "Say something", pitch: "Click in any text box, hold \(state.key.label) and talk.", button: "Try it here",
+              isDone: store.totals.words > 0) { state.section = .scratchpad },
+         Step(id: "style", title: "Choose your style", pitch: "Casual in messages, polished in email.", button: "Choose",
+              isDone: Settings.hasChosenStyle) { state.section = .style },
+         Step(id: "words", title: "Teach it a name", pitch: "Add the names and terms it should spell correctly.", button: "Add one",
+              isDone: !words.terms.isEmpty) { state.section = .words },
+         Step(id: "snippet", title: "Make a snippet", pitch: "Say a short phrase, get your link or sign-off.", button: "Make one",
+              isDone: !snippets.items.isEmpty) { state.section = .snippets },
+         Step(id: "connect", title: "Connect an AI app", pitch: "Ask Claude or Cursor about what you've dictated.", button: "Connect",
+              isDone: isConnected) { state.settings = .connections }]
+    }
+
+    private var recent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                SectionLabel("Recent").padding(.top, -20)
+                Spacer()
+                if !store.entries.isEmpty { Button("See all") { state.section = .history }.graphite(.ghost, small: true) }
             }
             if store.entries.isEmpty {
                 Card { Text("What you dictate shows up here.").foregroundStyle(Theme.muted).padding(20).frame(maxWidth: .infinity, alignment: .leading) }

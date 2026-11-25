@@ -25,13 +25,13 @@ struct Avatar: View {
     }
 }
 
-struct ProfileView: View {
+struct ProfilePane: View {
     @ObservedObject var profile: Profile
     @ObservedObject var store: HistoryStore
 
     var body: some View {
-        let stats = DictationStats(store.entries), insights = Insights(store.entries, now: Date())
-        Page(title: "Profile") {
+        let insights = Insights(store.entries, now: Date())
+        Pane(title: "Profile") {
             Card {
                 HStack(spacing: 20) {
                     Avatar(initials: profile.initials, size: 72)
@@ -44,7 +44,8 @@ struct ProfileView: View {
             }
             SectionLabel("Your voice")
             Card {
-                GraphiteRow(title: "Speaking pace") { value(stats.wordsPerMinute == 0 ? "Not enough yet" : "\(stats.wordsPerMinute) words a minute") }
+                GraphiteRow(title: "Rank") { value(Rank(words: store.totals.words).rawValue) }
+                GraphiteRow(title: "Speaking pace") { value(store.totals.wordsPerMinute == 0 ? "Not enough yet" : "\(store.totals.wordsPerMinute) words a minute") }
                 GraphiteRow(title: "Where you talk most") { value(insights.apps.first?.name ?? "Not enough yet") }
                 GraphiteRow(title: "Corrections you've made", isLast: true) { value(insights.corrected.formatted()) }
             }

@@ -11,6 +11,8 @@ final class Controller {
     var onRecordingChange: (Bool) -> Void = { _ in }
     var onLevel: (Float) -> Void = { _ in }
     var onWords: (String) -> Void = { _ in }
+    /// Final touches chosen by the user: style, then snippets. Called on the pipeline queue.
+    var finish: (String, String) -> String = { text, _ in text }
     var onResult: (Dictation, [Float]) -> Void = { _, _ in }
     /// Returns where the recording should go instead of being typed, e.g. the voice test.
     var captureTarget: () -> (([Float]) -> Void)? = { nil }
@@ -147,7 +149,8 @@ final class Controller {
 
             let cleanStart = Date()
             let shouldClean = Cleanup.shouldClean(transcript, enabled: options.cleanup)
-            let text = shouldClean ? Pipeline.cleanUp(transcript, context: job.context, allowClaude: allowClaude && !job.isSecure) : transcript
+            let cleaned = shouldClean ? Pipeline.cleanUp(transcript, context: job.context, allowClaude: allowClaude && !job.isSecure) : transcript
+            let text = job.isSecure ? cleaned : finish(cleaned, job.context.appName)
             let llmMs = shouldClean ? milliseconds(since: cleanStart) : 0
             let totalMs = milliseconds(since: started)
             let entry = Dictation(date: Date(), seconds: job.seconds, app: job.context.appName, outcome: .typed,

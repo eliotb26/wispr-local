@@ -2,9 +2,8 @@ import SwiftUI
 import WisprLocalCore
 
 struct WordsView: View {
-    @State private var terms: [String] = []
+    @ObservedObject var words: WordStore
     @State private var draft = ""
-    @State private var problem: String?
 
     var body: some View {
         Page(title: "Words", subtitle: "Names and terms to spell correctly.") {
@@ -13,38 +12,18 @@ struct WordsView: View {
                 Button("Add", action: add).graphite(.primary).disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding(.bottom, 16)
-            if let problem { Text(problem).foregroundStyle(Theme.danger).padding(.bottom, 12) }
-            if !terms.isEmpty { Card { ForEach(terms, id: \.self) { term in
-                GraphiteRow(title: term, isLast: term == terms.last) {
-                    Button("Remove") { save(terms.filter { $0 != term }) }.graphite(.ghost, small: true)
+            if let problem = words.problem { Text(problem).foregroundStyle(Theme.danger).padding(.bottom, 12) }
+            if !words.terms.isEmpty { Card { ForEach(words.terms, id: \.self) { term in
+                GraphiteRow(title: term, isLast: term == words.terms.last) {
+                    Button("Remove") { words.save(words.terms.filter { $0 != term }) }.graphite(.ghost, small: true)
                 }
             } } }
         }
-        .onAppear(perform: load)
-    }
-
-    private func load() {
-        guard FileManager.default.fileExists(atPath: Paths.vocabulary.path) else { return }
-        do {
-            terms = Vocabulary.unique(in: try String(contentsOf: Paths.vocabulary, encoding: .utf8))
-        } catch {
-            problem = "Couldn't read your words: \(error.localizedDescription)"
-        }
+        .onAppear(perform: words.load)
     }
 
     private func add() {
-        save(Vocabulary.adding(draft, to: terms))
+        words.save(Vocabulary.adding(draft, to: words.terms))
         draft = ""
-    }
-
-    private func save(_ new: [String]) {
-        do {
-            try FileManager.default.createDirectory(at: Paths.support, withIntermediateDirectories: true)
-            try Data((new.joined(separator: "\n") + "\n").utf8).write(to: Paths.vocabulary, options: .atomic)
-            terms = new
-            problem = nil
-        } catch {
-            problem = "Couldn't save: \(error.localizedDescription)"
-        }
     }
 }

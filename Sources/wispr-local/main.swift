@@ -5,6 +5,7 @@ import WisprLocalCore
 
 // wispr-local: hold the hotkey, talk, let go. Text lands in the focused field.
 
+if CommandLine.arguments.contains(ConnectorServer.flag) { ConnectorServer.run() }
 signal(SIGPIPE, SIG_IGN) // a helper that exits early must not take the app down
 let permissionPollSeconds: TimeInterval = 1
 let app = NSApplication.shared
@@ -53,6 +54,9 @@ if Paths.isApp {
         controller.forgetLast()
     }
     controller.onResult = { state.history.add($0, samples: $1) }
+    let snippets = state.snippets
+    controller.finish = { text, app in Snippets.expand(Settings.style(for: AppGroup(app: app)).apply(to: text), with: snippets.current) }
+    state.voiceTest.transcribe = { try server.transcribe(wav: $0, terms: $1) }
     controller.captureTarget = { mainWindow.captureTarget }
     statusMenu?.onOpen = { mainWindow.show() }
     statusMenu?.onRetry = controller.retryLast

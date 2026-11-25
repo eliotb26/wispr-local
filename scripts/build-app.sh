@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 APP="dist/$APP_NAME.app"
 PLIST="$APP/Contents/Info.plist"
-VERSION="${VERSION:-1.2}"
+VERSION="${VERSION:-1.3}"
 
 ./scripts/build-helpers.sh
 swift build -c release --arch arm64

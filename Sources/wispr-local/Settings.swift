@@ -29,6 +29,20 @@ enum Settings {
         set { defaults.set(newValue.rawValue, forKey: "look") }
     }
 
+    static func style(for group: AppGroup) -> WritingStyle {
+        defaults.string(forKey: "style-\(group.rawValue)").flatMap(WritingStyle.init) ?? .polished
+    }
+
+    static func setStyle(_ style: WritingStyle, for group: AppGroup) { defaults.set(style.rawValue, forKey: "style-\(group.rawValue)") }
+
+    static var hasChosenStyle: Bool { AppGroup.allCases.contains { defaults.string(forKey: "style-\($0.rawValue)") != nil } }
+
+    /// Whether the Home steps were closed.
+    static var hidesSteps: Bool {
+        get { defaults.bool(forKey: "hidesSteps") }
+        set { defaults.set(newValue, forKey: "hidesSteps") }
+    }
+
     static var playSound: Bool {
         get { defaults.object(forKey: "playSound") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "playSound") }

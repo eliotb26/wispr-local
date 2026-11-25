@@ -5,9 +5,13 @@ import WisprLocalCore
 final class HistoryStore: ObservableObject {
     @Published private(set) var entries: [Dictation] = [] // newest first
     @Published var problem: String?
+    @Published private(set) var totals = Totals()
+    @Published var newRank: Rank? // shown once, then cleared
+    private let totalsFile = JSONFile<Totals>(url: Paths.totals)
     private let file = HistoryFile(url: Paths.history)
     private var purgeTimer: Timer?
 
+    private var areTotalsLoaded = false
     private var isLoaded = false // a file that couldn't be read must never be overwritten
 
     init() {
@@ -15,6 +19,12 @@ final class HistoryStore: ObservableObject {
             try FileManager.default.createDirectory(at: Paths.support, withIntermediateDirectories: true)
             entries = try file.load().reversed()
             isLoaded = true
+        }
+        attempt {
+            let saved = try totalsFile.load()
+            guard saved != nil || isLoaded else { return } // never start from a history that couldn't be read
+            totals = saved ?? Totals(entries)
+            areTotalsLoaded = true
         }
         purge()
         purgeTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.purge() }
@@ -25,11 +35,21 @@ final class HistoryStore: ObservableObject {
         attempt {
             try file.append(entry)
             entries = [entry] + entries
+            try count(entry)
             guard Settings.keepAudio, entry.outcome == .typed else { return }
             try FileManager.default.createDirectory(at: Paths.recordings, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
             try WavEncoder.encode(samples).write(to: audio(entry.id))
         }
+    }
+
+    private func count(_ entry: Dictation) throws {
+        guard areTotalsLoaded else { return }
+        let updated = totals.adding(entry)
+        try totalsFile.save(updated)
+        let before = Rank(words: totals.words), after = Rank(words: updated.words)
+        totals = updated
+        if after != before { newRank = after }
     }
 
     func correct(_ entry: Dictation, to text: String) {
@@ -41,11 +61,13 @@ final class HistoryStore: ObservableObject {
     /// Deletes the history, its recordings and the timing log.
     func deleteAll() {
         attempt {
-            for url in [file.url, Paths.recordings, Paths.runs] where FileManager.default.fileExists(atPath: url.path) {
+            for url in [file.url, Paths.recordings, Paths.runs, Paths.totals] where FileManager.default.fileExists(atPath: url.path) {
                 try FileManager.default.removeItem(at: url)
             }
             entries = []
+            totals = Totals()
             isLoaded = true
+            areTotalsLoaded = true
         }
     }
 
@@ -73,7 +95,7 @@ final class HistoryStore: ObservableObject {
     private func attempt(_ work: () throws -> Void) {
         do {
             try work()
-            problem = nil
+            if isLoaded { problem = nil }
         } catch {
             log("history: \(error)")
             problem = "History couldn't be saved: \(error.localizedDescription)"

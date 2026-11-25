@@ -4,10 +4,8 @@ import SwiftUI
 import WisprLocalCore
 
 enum Section: String, CaseIterable {
-    case home = "Home", history = "History", insights = "Insights", words = "Words", voice = "Voice test"
-    case settings = "Settings", profile = "Profile"
-
-    static let main: [Section] = [.home, .history, .insights, .words, .voice]
+    case home = "Home", history = "History", insights = "Insights", words = "Words"
+    case snippets = "Snippets", style = "Style", scratchpad = "Scratchpad"
 
     var icon: String {
         switch self {
@@ -15,9 +13,9 @@ enum Section: String, CaseIterable {
         case .history: return "clock.arrow.circlepath"
         case .insights: return "chart.bar"
         case .words: return "character.book.closed"
-        case .voice: return "waveform"
-        case .settings: return "gearshape"
-        case .profile: return "person"
+        case .snippets: return "text.insert"
+        case .style: return "textformat"
+        case .scratchpad: return "note.text"
         }
     }
 }
@@ -43,6 +41,13 @@ final class AppState: ObservableObject {
     @Published var key: HotKey
     lazy var history = HistoryStore() // created only by the app, not the command-line tool
     @Published var look = Settings.look { didSet { Settings.look = look } }
+    /// The open settings tab, if any. Opening takes focus from whatever was being typed into.
+    @Published var settings: SettingsTab? {
+        didSet { if oldValue == nil, settings != nil { NSApp.keyWindow?.makeFirstResponder(nil) } }
+    }
+    lazy var snippets = SnippetStore()
+    lazy var notes = NoteStore()
+    lazy var words = WordStore()
     let voiceTest = VoiceTest()
     let voice = LiveVoice()
     let profile = Profile()
@@ -61,7 +66,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
 
     /// Where recordings go while the voice test is on screen and in front.
     var captureTarget: (([Float]) -> Void)? {
-        guard NSApp.isActive, window.isVisible, state.section == .voice, !state.voiceTest.isDone else { return nil }
+        guard NSApp.isActive, window.isVisible, state.settings == .voice, !state.voiceTest.isDone, !state.voiceTest.isTuning else { return nil }
         return state.voiceTest.save
     }
 
@@ -81,7 +86,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
-        window.contentMinSize = NSSize(width: 840, height: 560)
+        window.contentMinSize = NSSize(width: 980, height: 620)
         window.delegate = self
         let content = NSHostingView(rootView: RootView(state: state))
         content.sizingOptions = [] // the window keeps its size when the page changes
@@ -116,6 +121,10 @@ private struct RootView: View {
                 .padding([.vertical, .trailing], 8)
         }
         .background(Theme.window)
+        .disabled(state.settings != nil)
+        .accessibilityHidden(state.settings != nil)
+        .overlay { SettingsModal(state: state, profile: profile) }
+        .overlay(alignment: .bottom) { RankToast(store: state.history) }
         .ignoresSafeArea()
         .font(Theme.body)
         .foregroundStyle(Theme.text)
@@ -125,13 +134,13 @@ private struct RootView: View {
     private var page: some View {
         Group {
             switch state.section {
-            case .home: HomeView(state: state, store: state.history, profile: profile, voice: state.voice)
+            case .home: HomeView(state: state, store: state.history, profile: profile, voice: state.voice, words: state.words, snippets: state.snippets)
             case .history: HistoryView(store: state.history, keyLabel: state.key.label)
             case .insights: InsightsView(store: state.history)
-            case .words: WordsView()
-            case .voice: VoiceTestView(test: state.voiceTest, voice: state.voice, keyLabel: state.key.label)
-            case .settings: SettingsView(state: state)
-            case .profile: ProfileView(profile: profile, store: state.history)
+            case .words: WordsView(words: state.words)
+            case .snippets: SnippetsView(store: state.snippets)
+            case .style: StyleView()
+            case .scratchpad: ScratchpadView(store: state.notes)
             }
         }
         .id(state.section)
@@ -143,25 +152,30 @@ private struct RootView: View {
             HStack(spacing: 8) {
                 LogoMark().frame(width: 22, height: 22)
                 Text(Paths.appName).font(.custom("Geist-SemiBold", fixedSize: 16)).tracking(-0.3)
+                Button { state.settings = .plan } label: {
+                    Text("Free").font(Theme.captionStrong).foregroundStyle(Theme.accentText).padding(.horizontal, 7).frame(height: 20)
+                        .background(Capsule().fill(Theme.accentSubtle))
+                }
+                .buttonStyle(PressStyle()).accessibilityLabel("Your plan: Free")
             }
             .padding(.horizontal, 12).padding(.top, 52).padding(.bottom, 20)
-            ForEach(Array(Section.main.enumerated()), id: \.element) { index, section in
+            ForEach(Array(Section.allCases.enumerated()), id: \.element) { index, section in
                 row(section).keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: .command)
             }
             Spacer()
             if !state.isReady {
                 Text(state.status).font(Theme.small).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true).padding(12)
             }
-            row(.settings).keyboardShortcut(",", modifiers: .command)
-            Button { select(.profile) } label: {
+            Button { state.settings = .general } label: { label("Settings", "gearshape") }
+                .buttonStyle(SidebarButton(isSelected: false, selection: selection, height: 36)).keyboardShortcut(",", modifiers: .command)
+            Button { state.settings = .profile } label: {
                 HStack(spacing: 10) {
                     Avatar(initials: profile.initials, size: 28)
                     Text(profile.name.isEmpty ? "Your profile" : profile.name).font(Theme.bodyMedium).lineLimit(1)
                     Spacer(minLength: 0)
                 }
             }
-            .buttonStyle(SidebarButton(isSelected: state.section == .profile, selection: selection, height: 44))
-            .accessibilityLabel("Profile")
+            .buttonStyle(SidebarButton(isSelected: false, selection: selection, height: 44)).accessibilityLabel("Profile")
         }
         .padding(.horizontal, 8).padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -169,14 +183,18 @@ private struct RootView: View {
 
     private func row(_ section: Section) -> some View {
         Button { select(section) } label: {
-            HStack(spacing: 10) {
-                Image(systemName: section.icon).font(.system(size: 14, weight: .medium)).frame(width: 20)
-                Text(section.rawValue).font(Theme.bodyMedium)
-                Spacer(minLength: 0)
-            }
+            label(section.rawValue, section.icon)
         }
         .buttonStyle(SidebarButton(isSelected: state.section == section, selection: selection, height: 36))
         .accessibilityAddTraits(state.section == section ? .isSelected : [])
+    }
+
+    private func label(_ title: String, _ icon: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon).font(.system(size: 14, weight: .medium)).frame(width: 20)
+            Text(title).font(Theme.bodyMedium)
+            Spacer(minLength: 0)
+        }
     }
 
     private func select(_ section: Section) {

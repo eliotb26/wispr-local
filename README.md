@@ -33,7 +33,7 @@ This builds Chirpkey and puts it in Applications. Open it, allow Microphone and 
 
 The built app includes whisper.cpp and downloads its speech models (575 MB) on first launch, so it runs on an Apple silicon Mac without Homebrew. `./scripts/release.sh` makes a notarized DMG.
 
-Opening the app shows its window: History (search, copy, correct), My words (names and terms to spell correctly), Voice test (30 sentences to record) and Settings. The mic menu has Retry Last Dictation. `scripts/voice-eval.py models/*turbo*.bin` then measures a model on your voice.
+Opening the app shows its window: Home (totals, streak, rank, next steps), History, Insights, Words, Snippets (a short phrase types a longer text), Style (punctuation and capitals per kind of app) and Scratchpad. Settings opens over it. Its Your voice tab records sentences and adds words that measurably lower your error rate; Connections lets Claude Code, Claude or Cursor search your dictations and notes, read only. The mic menu has Retry Last Dictation. `scripts/voice-eval.py models/*turbo*.bin` then measures a model on your voice.
 
 Cleanup runs on your Mac with Apple's built-in model (macOS 26 with Apple Intelligence on). Spoken corrections, and edits that changed your words, go to the [Claude Code](https://claude.com/claude-code) CLI if it's installed. In the app this is off until you turn on "Use Claude for hard edits" in Settings. Use `--local` to never call Claude, or `--raw` for no cleanup. For other languages, add `--lang es` or `--lang auto`.
 
