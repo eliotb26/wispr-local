@@ -54,6 +54,7 @@ if Paths.isApp {
         controller.forgetLast()
     }
     controller.onResult = { state.history.add($0, samples: $1) }
+    Pipeline.onClaude = { DispatchQueue.main.async { state.history.countClaudeEdit() } }
     let snippets = state.snippets
     controller.finish = { text, app in Snippets.expand(Settings.style(for: AppGroup(app: app)).apply(to: text), with: snippets.current) }
     state.voiceTest.transcribe = { try server.transcribe(wav: $0, terms: $1) }

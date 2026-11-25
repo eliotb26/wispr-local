@@ -6,6 +6,9 @@ enum Pipeline {
     static let silentPeak: Float = 0.01
     static let speechCheckTimeout: TimeInterval = 5
 
+    /// Called each time text is sent to Claude, off the main thread.
+    static var onClaude: () -> Void = {}
+
     /// Whether there is no speech. If the check can't run, only near-total silence counts.
     static func isSilent(_ samples: [Float]) -> Bool {
         let wav = FileManager.default.temporaryDirectory.appendingPathComponent("wispr-local-\(UUID().uuidString).wav")
@@ -32,6 +35,7 @@ enum Pipeline {
         }
         let fallback = Disfluency.strip(transcript)
         guard allowClaude else { return fallback }
+        onClaude()
         do {
             let text = try claude(transcript, context: context)
             return CleanupGuard.isPlausible(text, for: transcript) ? text : fallback

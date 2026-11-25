@@ -32,6 +32,15 @@ final class FeatureTests: XCTestCase {
         XCTAssertEqual(week.map(\.isActive), [false, false, true, false, false, false, false])
     }
 
+    func testMonthsAndOldFiles() throws {
+        let totals = Totals([entry(0), entry(30)], calendar: calendar).addingClaudeEdit(at: now, calendar: calendar)
+        XCTAssertEqual(totals.month(now, calendar: calendar), Totals.Month(words: 3, claudeEdits: 1))
+        XCTAssertEqual(totals.months.count, 2)
+        let old = try JSONDecoder().decode(Totals.self, from: Data(#"{"words":5,"seconds":2,"days":["2025-11-25"]}"#.utf8))
+        XCTAssertEqual(old.words, 5)
+        XCTAssertEqual(old.with(months: totals.months).month(now, calendar: calendar).words, 3)
+    }
+
     func testRanks() {
         XCTAssertEqual(Rank(words: 0), .hatchling)
         XCTAssertEqual(Rank(words: 2_500), .songbird)

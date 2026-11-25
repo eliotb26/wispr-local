@@ -31,7 +31,7 @@ struct ProfilePane: View {
 
     var body: some View {
         let insights = Insights(store.entries, now: Date())
-        Pane(title: "Profile") {
+        Pane(title: "Account") {
             Card {
                 HStack(spacing: 20) {
                     Avatar(initials: profile.initials, size: 72)
@@ -49,7 +49,12 @@ struct ProfilePane: View {
                 GraphiteRow(title: "Where you talk most") { value(insights.apps.first?.name ?? "Not enough yet") }
                 GraphiteRow(title: "Corrections you've made", isLast: true) { value(insights.corrected.formatted()) }
             }
-            Text("Your profile stays on this Mac. There is no account.").font(Theme.small).foregroundStyle(Theme.muted).padding(.top, 12)
+            SectionLabel("Your data")
+            Card {
+                GraphiteRow(title: "Kept on this Mac", detail: "There is no online account to sign in to.", isLast: true) {
+                    Button("Show files") { NSWorkspace.shared.open(Paths.support) }.graphite()
+                }
+            }
         }
     }
 

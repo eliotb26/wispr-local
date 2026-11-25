@@ -6,11 +6,31 @@ public struct Totals: Codable, Equatable, Sendable {
     public let words: Int
     public let seconds: TimeInterval
     public let days: Set<String> // "2026-11-25"
+    public let months: [String: Month] // by "2026-11"
 
-    public init(words: Int = 0, seconds: TimeInterval = 0, days: Set<String> = []) {
+    public struct Month: Codable, Equatable, Sendable {
+        public let words: Int
+        public let claudeEdits: Int
+
+        public init(words: Int = 0, claudeEdits: Int = 0) {
+            self.words = words
+            self.claudeEdits = claudeEdits
+        }
+    }
+
+    public init(words: Int = 0, seconds: TimeInterval = 0, days: Set<String> = [], months: [String: Month] = [:]) {
         self.words = words
         self.seconds = seconds
         self.days = days
+        self.months = months
+    }
+
+    /// Files saved before months were counted have none.
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(words: try values.decode(Int.self, forKey: .words), seconds: try values.decode(TimeInterval.self, forKey: .seconds),
+                  days: try values.decode(Set<String>.self, forKey: .days),
+                  months: try values.decodeIfPresent([String: Month].self, forKey: .months) ?? [:])
     }
 
     public init(_ entries: [Dictation], calendar: Calendar = .current) {
@@ -20,9 +40,26 @@ public struct Totals: Codable, Equatable, Sendable {
     /// Counts spoken words, so a long snippet isn't a shortcut to the next rank.
     public func adding(_ entry: Dictation, calendar: Calendar = .current) -> Totals {
         guard entry.outcome == .typed else { return self }
-        return Totals(words: words + Cleanup.wordCount(entry.heard), seconds: seconds + entry.seconds,
-                      days: days.union([Self.key(entry.date, calendar)]))
+        let spoken = Cleanup.wordCount(entry.heard), month = month(entry.date, calendar: calendar)
+        return Totals(words: words + spoken, seconds: seconds + entry.seconds, days: days.union([Self.key(entry.date, calendar)]),
+                      months: setting(Month(words: month.words + spoken, claudeEdits: month.claudeEdits), at: entry.date, calendar))
     }
+
+    public func addingClaudeEdit(at date: Date, calendar: Calendar = .current) -> Totals {
+        let month = month(date, calendar: calendar)
+        return Totals(words: words, seconds: seconds, days: days,
+                      months: setting(Month(words: month.words, claudeEdits: month.claudeEdits + 1), at: date, calendar))
+    }
+
+    public func with(months: [String: Month]) -> Totals { Totals(words: words, seconds: seconds, days: days, months: months) }
+
+    public func month(_ date: Date, calendar: Calendar = .current) -> Month { months[Self.monthKey(date, calendar)] ?? Month() }
+
+    private func setting(_ month: Month, at date: Date, _ calendar: Calendar) -> [String: Month] {
+        months.merging([Self.monthKey(date, calendar): month]) { $1 }
+    }
+
+    private static func monthKey(_ date: Date, _ calendar: Calendar) -> String { String(key(date, calendar).prefix(7)) }
 
     public var wordsPerMinute: Int { seconds > 0 ? Int((Double(words) / (seconds / 60)).rounded()) : 0 }
 

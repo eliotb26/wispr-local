@@ -3,7 +3,7 @@ import WisprLocalCore
 
 enum SettingsTab: String, CaseIterable {
     case general = "General", voice = "Your voice", connections = "Connections", privacy = "Privacy"
-    case profile = "Profile", plan = "Plan"
+    case profile = "Account", plan = "Plan and spend"
 
     static let app: [SettingsTab] = [.general, .voice, .connections, .privacy]
     static let you: [SettingsTab] = [.profile, .plan]
@@ -94,7 +94,7 @@ struct SettingsModal: View {
         case .connections: ConnectionsPane()
         case .privacy: PrivacyPane(state: state)
         case .profile: ProfilePane(profile: profile, store: state.history)
-        case .plan: PlanPane()
+        case .plan: PlanPane(store: state.history)
         }
     }
 }
@@ -203,21 +203,36 @@ private struct PrivacyPane: View {
 }
 
 private struct PlanPane: View {
-    private static let included = ["Unlimited dictation on this Mac", "Snippets, styles and scratchpad", "Connections to your AI apps", "No account and no card"]
+    @ObservedObject var store: HistoryStore
+    private static let included = ["Unlimited dictation on this Mac", "Snippets, styles and scratchpad", "Connections to your AI apps"]
 
     var body: some View {
-        Pane(title: "Plan") {
+        let month = store.totals.month(Date())
+        Pane(title: "Plan and spend") {
             Card {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Free").font(Theme.display).tracking(-0.8)
-                        Spacer()
-                        Text("Your plan").font(Theme.small).foregroundStyle(Theme.muted)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(0.formatted(.currency(code: "USD"))).font(Theme.display).tracking(-0.8).monospacedDigit()
+                        Text("spent in \(Date().formatted(.dateTime.month(.wide)))").font(Theme.small).foregroundStyle(Theme.muted)
                     }
-                    ForEach(Self.included, id: \.self) { Label($0, systemImage: "checkmark").foregroundStyle(Theme.text) }
+                    .accessibilityElement(children: .combine)
+                    Spacer()
+                    Text("Free").font(Theme.captionStrong).foregroundStyle(Theme.accentText).padding(.horizontal, 8).frame(height: 22)
+                        .background(Capsule().fill(Theme.accentSubtle))
                 }
                 .padding(20)
+                Hairline()
+                GraphiteRow(title: "Words this month") { value(month.words) }
+                GraphiteRow(title: "Edits sent to Claude", detail: "Uses your own Claude plan. Its cost isn't counted here.", isLast: true) { value(month.claudeEdits) }
             }
+            SectionLabel("Included")
+            Card {
+                VStack(alignment: .leading, spacing: 12) { ForEach(Self.included, id: \.self) { Label($0, systemImage: "checkmark") } }
+                    .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Text("No card is on file, so nothing can be charged.").font(Theme.small).foregroundStyle(Theme.muted).padding(.top, 12)
         }
     }
+
+    private func value(_ number: Int) -> some View { Text(number.formatted()).foregroundStyle(Theme.muted).monospacedDigit().countsUp("\(number)") }
 }

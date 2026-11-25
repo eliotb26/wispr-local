@@ -23,7 +23,8 @@ final class HistoryStore: ObservableObject {
         attempt {
             let saved = try totalsFile.load()
             guard saved != nil || isLoaded else { return } // never start from a history that couldn't be read
-            totals = saved ?? Totals(entries)
+            let counted = Totals(entries)
+            totals = saved.map { $0.months.isEmpty ? $0.with(months: counted.months) : $0 } ?? counted
             areTotalsLoaded = true
         }
         purge()
@@ -50,6 +51,15 @@ final class HistoryStore: ObservableObject {
         let before = Rank(words: totals.words), after = Rank(words: updated.words)
         totals = updated
         if after != before { newRank = after }
+    }
+
+    func countClaudeEdit() {
+        guard areTotalsLoaded, Settings.retention != .off else { return }
+        attempt {
+            let updated = totals.addingClaudeEdit(at: Date())
+            try totalsFile.save(updated)
+            totals = updated
+        }
     }
 
     func correct(_ entry: Dictation, to text: String) {
