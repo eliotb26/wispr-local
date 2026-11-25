@@ -4,6 +4,8 @@ set -euo pipefail
 
 MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
 MODEL_PATH="models/ggml-large-v3-turbo-q5_0.bin"
+VAD_URL="https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin"
+VAD_PATH="models/ggml-silero-v5.1.2.bin"
 
 cd "$(dirname "$0")/.."
 
@@ -22,6 +24,12 @@ if [ ! -f "$MODEL_PATH" ]; then
   mkdir -p models
   curl -L --fail --progress-bar -o "$MODEL_PATH.part" "$MODEL_URL"
   mv "$MODEL_PATH.part" "$MODEL_PATH"
+fi
+
+if [ ! -f "$VAD_PATH" ]; then
+  echo "Downloading the speech detector (1 MB)..."
+  curl -L --fail --progress-bar -o "$VAD_PATH.part" "$VAD_URL"
+  mv "$VAD_PATH.part" "$VAD_PATH"
 fi
 
 if ! command -v claude >/dev/null; then

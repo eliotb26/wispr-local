@@ -3,3 +3,4 @@ models/
 runs.csv
 .DS_Store
 .swiftpm/
+dist/

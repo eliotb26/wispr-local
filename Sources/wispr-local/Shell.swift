@@ -32,7 +32,7 @@ func run(_ arguments: [String], stdin: String? = nil, cwd: URL? = nil, timeout: 
     DispatchQueue.global().async(group: group) { stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile() }
     DispatchQueue.global().async(group: group) { stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile() }
 
-    if let stdin { stdinPipe.fileHandleForWriting.write(Data(stdin.utf8)) }
+    if let stdin { try? stdinPipe.fileHandleForWriting.write(contentsOf: Data(stdin.utf8)) } // a failed child is reported below
     try? stdinPipe.fileHandleForWriting.close()
 
     guard group.wait(timeout: .now() + timeout) == .success else {
@@ -42,8 +42,8 @@ func run(_ arguments: [String], stdin: String? = nil, cwd: URL? = nil, timeout: 
     process.waitUntilExit()
 
     guard process.terminationStatus == 0 else {
-        let message = String(decoding: stderrData, as: UTF8.self).prefix(300)
-        throw AppError.process("\(arguments[0]) exited \(process.terminationStatus): \(message)")
+        // The tool's own message could quote the dictation, and errors are logged, so leave it out.
+        throw AppError.process("\(arguments[0]) exited \(process.terminationStatus) (\(stderrData.count) bytes of errors)")
     }
     return String(decoding: stdoutData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
 }

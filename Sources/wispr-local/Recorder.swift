@@ -1,55 +1,71 @@
 import AVFoundation
+import WisprLocalCore
 
-/// Records the default microphone to a 16 kHz mono WAV, the format whisper.cpp expects.
+/// Records the default microphone as 16 kHz mono samples, kept in memory.
 final class Recorder {
-    static let sampleRate: Double = 16_000
+    static let sampleRate = Double(WavEncoder.sampleRate)
+    private static let levelGain: Float = 12
+
+    /// Loudness from 0 to 1, called on the main thread.
+    var onLevel: (Float) -> Void = { _ in }
 
     private let engine = AVAudioEngine()
-    private let fileLock = NSLock()
-    private var file: AVAudioFile? // written on the audio thread, closed on main: guarded by fileLock
+    private let lock = NSLock()
+    private var samples: [Float] = [] // appended on the audio thread: guarded by lock
     private(set) var startedAt: Date?
 
     var isRecording: Bool { startedAt != nil }
 
-    func start(to url: URL) throws {
+    func start() throws {
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
-        guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Self.sampleRate, channels: 1, interleaved: false),
+        guard inputFormat.sampleRate > 0,
+              let outputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Self.sampleRate, channels: 1, interleaved: false),
               let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
-            throw AppError.audio("cannot convert from \(inputFormat)")
+            throw AppError.audio("no usable microphone")
         }
-        let wavSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: Self.sampleRate,
-            AVNumberOfChannelsKey: 1,
-            AVLinearPCMBitDepthKey: 16,
-            AVLinearPCMIsFloatKey: false,
-        ]
-        let newFile = try AVAudioFile(forWriting: url, settings: wavSettings, commonFormat: .pcmFormatFloat32, interleaved: false)
-        fileLock.withLock { file = newFile }
-
-        let ratio = outputFormat.sampleRate / inputFormat.sampleRate
-        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self,
-                  let converted = Self.convert(buffer, with: converter, to: outputFormat, ratio: ratio) else { return }
-            self.fileLock.withLock { try? self.file?.write(from: converted) }
+        lock.withLock { samples = [] }
+        let ratio = Self.sampleRate / inputFormat.sampleRate
+        input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self] buffer, _ in
+            guard let self, let chunk = Self.convert(buffer, with: converter, to: outputFormat, ratio: ratio) else { return }
+            self.lock.withLock { self.samples.append(contentsOf: chunk) }
+            let level = Self.level(chunk)
+            DispatchQueue.main.async { self.onLevel(level) }
         }
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            input.removeTap(onBus: 0) // a leftover tap would crash the next start
+            throw error
+        }
         startedAt = Date()
     }
 
-    /// Stops recording, finalises the WAV and returns the seconds captured.
-    func stop() -> TimeInterval {
+    /// Everything heard so far, or just the last `seconds` of it.
+    func snapshot(last seconds: Double? = nil) -> [Float] {
+        lock.withLock {
+            guard let seconds else { return samples }
+            return Array(samples.suffix(Int(seconds * Self.sampleRate)))
+        }
+    }
+
+    /// Stops recording and returns the audio with the seconds captured.
+    func stop() -> (samples: [Float], seconds: TimeInterval) {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
-        fileLock.withLock { file = nil } // releasing the file writes the WAV header
         defer { startedAt = nil }
-        return startedAt.map { Date().timeIntervalSince($0) } ?? 0
+        return (snapshot(), startedAt.map { Date().timeIntervalSince($0) } ?? 0)
+    }
+
+    private static func level(_ chunk: [Float]) -> Float {
+        guard !chunk.isEmpty else { return 0 }
+        let power = chunk.reduce(0) { $0 + $1 * $1 } / Float(chunk.count)
+        return min(1, power.squareRoot() * levelGain)
     }
 
     private static func convert(_ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter,
-                                to format: AVAudioFormat, ratio: Double) -> AVAudioPCMBuffer? {
+                                to format: AVAudioFormat, ratio: Double) -> [Float]? {
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1
         guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
         var consumed = false
@@ -63,6 +79,7 @@ final class Recorder {
             status.pointee = .haveData
             return buffer
         }
-        return error == nil ? output : nil
+        guard error == nil, let data = output.floatChannelData else { return nil }
+        return Array(UnsafeBufferPointer(start: data[0], count: Int(output.frameLength)))
     }
 }
